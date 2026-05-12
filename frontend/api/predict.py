@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from predict import (
+from _core import (
     COHORT_MEDIANS,
     ENDPOINTS,
     HARD_REQUIRED,

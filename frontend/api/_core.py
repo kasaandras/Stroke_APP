@@ -23,7 +23,7 @@ import numpy as np
 from scipy.special import expit
 from scipy.stats import truncnorm
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_DIR = Path(__file__).resolve().parent / "data"
 
 # Thresholds defining the 4-level age x days_ps intercept grid at training time.
 AGE_CUT, DAYS_CUT = 68, 10

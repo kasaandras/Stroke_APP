@@ -13,7 +13,7 @@ samples fall inside the clinical bounds (continuous) or [0,1] (binary).
 """
 import numpy as np
 
-from predict import (
+from _core import (
     ENDPOINTS,
     _linpred_continuous,
     _linpred_binary,

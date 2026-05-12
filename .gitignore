@@ -1,8 +1,8 @@
 # macOS
 .DS_Store
 
-# Python (backend/)
-backend/.venv/
+# Python serverless functions in frontend/api/
+frontend/api/.venv/
 __pycache__/
 *.pyc
 *.pyo

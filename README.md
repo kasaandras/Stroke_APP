@@ -1,38 +1,74 @@
 # TARGET_BCN_APP
 
-Clinical prediction web app for the TARGET thesis. The frontend is a Next.js + TypeScript UI; the backend is a Python serverless API (FastAPI, Vercel-style) that loads posterior draws and serves predictions.
+Clinical prediction web app for the TARGET Master's thesis (UPC Barcelona).
+A clinician enters patient data at admission; the app shows live Bayesian
+predictions of five stroke-rehab discharge outcomes (Barthel, FIM Total,
+FIM Motor, walking probability, mRS ≤ 2 probability) with 50% / 95%
+credible intervals.
 
 ## Folder structure
 
 ```
 TARGET_BCN_APP/
-├── frontend/   # Next.js + TypeScript + Tailwind
-├── backend/    # Python serverless (FastAPI)
-├── data/       # Posterior draws .pkl files (added later)
+├── frontend/
+│   ├── src/                  # Next.js + TypeScript UI
+│   └── api/                  # Python serverless functions (Vercel)
+│       ├── predict.py        # POST /api/predict (FastAPI app)
+│       ├── _core.py          # predict() implementation + constants
+│       ├── _tests.py         # self-consistency tests vs stored draws
+│       ├── data/*.pkl        # posterior draws from the thesis fit
+│       └── requirements.txt  # numpy / scipy / fastapi / uvicorn
 └── README.md
 ```
 
-## Frontend — run the dev server
+The Python code lives inside `frontend/api/` because Vercel's Python
+runtime auto-detects serverless functions in a project's top-level
+`api/` directory. With Vercel's Root Directory set to `frontend`,
+`frontend/api/predict.py` is served at `/api/predict` automatically.
+
+## Local development
+
+Two processes: a Next.js dev server and a uvicorn process. The Next.js
+rewrite (`next.config.ts`) proxies `/api/*` to uvicorn when the
+`BACKEND_URL` env var is set; on Vercel `BACKEND_URL` is unset, so the
+rewrite is a no-op and `/api/predict` goes straight to the Python
+serverless function.
 
 ```bash
+# Terminal 1 -- backend
+cd frontend/api
+python3.13 -m venv .venv                 # first time only
+./.venv/bin/pip install -r requirements.txt   # first time only
+./.venv/bin/uvicorn predict:app --reload --port 8000
+
+# Terminal 2 -- frontend
 cd frontend
-npm install        # first time only
+cp .env.local.example .env.local          # first time only
+npm install                                # first time only
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open <http://localhost:3000>. Predictions update 300 ms after the last
+keystroke.
 
-## Backend — run locally
+## Running the prediction self-tests
 
 ```bash
-cd backend
-source .venv/bin/activate          # activate the virtualenv
-pip install -r requirements.txt    # first time only
-uvicorn main:app --reload --port 8000
+cd frontend/api
+./.venv/bin/python _tests.py
 ```
 
-The API will be at http://localhost:8000.
+The tests reconstruct raw features from 15 training rows across the five
+endpoints, push them through `predict()`, and confirm the deterministic
+linear predictor matches what's stored in the pickles to 1e-10.
 
-## Data
+## Deploying to Vercel
 
-Drop posterior draw `.pkl` files into `data/`. They're git-ignored placeholders for now — the backend will load them at request time.
+1. **Import** the repo (`kasaandras/Stroke_APP`) in Vercel.
+2. **Framework Preset:** Next.js.
+3. **Root Directory:** `frontend` (Vercel will scan `frontend/api/`
+   for Python functions automatically).
+4. Do **not** set `BACKEND_URL` -- leaving it unset disables the dev proxy
+   so requests reach the deployed Python function directly.
+5. Click **Deploy**. The first cold start may take a few seconds
+   (numpy + scipy import); subsequent requests are fast.
