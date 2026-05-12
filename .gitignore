@@ -1,8 +1,28 @@
 # macOS
 .DS_Store
 
-# Python serverless functions in frontend/api/
-frontend/api/.venv/
+# Node / Next.js
+/node_modules
+/.next/
+/out/
+/build
+/coverage
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Python (api/)
+api/.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -13,14 +33,14 @@ __pycache__/
 # Env files (do not commit secrets)
 .env
 .env.*
-!.env.example
+!.env.local.example
 
 # Editor
 .vscode/
 .idea/
 
-# Logs
-*.log
-
 # Vercel
 .vercel/
+
+# Misc
+*.pem
