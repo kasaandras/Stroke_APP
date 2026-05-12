@@ -3,9 +3,11 @@ export default function Banner() {
     <header className="w-full bg-[#1e3a4b] text-[#e6eef3]">
       <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
         <p className="text-[13px] leading-snug">
-          Trained on a Hospital del Mar cohort of ~208 acute stroke patients
-          (median days post-stroke = 6, IQR 4–11.5). Predictions apply to early
-          rehabilitation; outside this window they are extrapolation.
+          Trained on ~208 acute stroke patients at Hospital del Mar receiving
+          standard inpatient rehabilitation — physiotherapy with occasional
+          speech and language therapy — at median 6 days post-stroke (IQR 4–11.5).
+          Predictions assume similar care and timing; outside this window they
+          are extrapolation.
           <span className="ml-1 align-top text-[10px]">*</span>
         </p>
         <p className="mt-1 text-[11px] leading-snug text-[#a8c0cd]">
