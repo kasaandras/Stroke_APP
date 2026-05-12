@@ -32,6 +32,9 @@ export default function EndpointCard({ spec, result, features, loading }: Props)
             Locked
           </span>
         </header>
+        {spec.subtitle ? (
+          <p className="mt-0.5 text-[11px] text-slate-400">{spec.subtitle}</p>
+        ) : null}
         {missing.length > 0 ? (
           <p className="mt-2 text-xs text-slate-500">
             Needs:{" "}
@@ -78,6 +81,9 @@ export default function EndpointCard({ spec, result, features, loading }: Props)
           </span>
         )}
       </header>
+      {spec.subtitle ? (
+        <p className="mt-0.5 text-[11px] text-slate-500">{spec.subtitle}</p>
+      ) : null}
 
       <div className="mt-4">
         <Bar

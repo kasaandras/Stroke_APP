@@ -39,6 +39,9 @@ export type EndpointSpec = {
   title: string;
   /** Short label used in the mobile chip strip. */
   short: string;
+  /** Small clarifying line under the title. Used on binary endpoints to
+   * spell out exactly what the percentage refers to. */
+  subtitle?: string;
   kind: "continuous" | "binary";
   /** For continuous endpoints: the axis range and which field holds the
    * admission baseline (rendered as a small diamond on the same axis). */
@@ -71,12 +74,14 @@ export const ENDPOINTS: EndpointSpec[] = [
     key: "Gait",
     title: "Walking at discharge",
     short: "Walking",
+    subtitle: "Probability of gait velocity ≥ 0.4 m/s at discharge",
     kind: "binary",
   },
   {
     key: "MRS",
     title: "Good outcome (mRS ≤ 2)",
     short: "mRS ≤ 2",
+    subtitle: "Probability of mRS ≤ 2 at discharge",
     kind: "binary",
   },
 ];
