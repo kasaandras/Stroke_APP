@@ -129,8 +129,7 @@ export default function Page() {
 
         <footer className="mt-12 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-400">
           Research prototype for the TARGET Master&apos;s thesis (UPC
-          Barcelona). Not for clinical decision-making outside the supervised
-          feedback loop with Dr Nevajda.
+          Barcelona). Not for clinical decision-making.
         </footer>
       </main>
     </>
