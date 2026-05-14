@@ -11,9 +11,9 @@ type Props = {
 export default function NumberInput({ field, value, onChange, warning }: Props) {
   return (
     <label className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-medium text-slate-700">{field.label}</span>
-        <span className="text-[11px] tabular-nums text-slate-400">
+        <span className="text-[11px] tabular-nums text-slate-400 text-right">
           {field.min}–{field.max}
           {field.hint ? ` · ${field.hint}` : ""}
         </span>
