@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "TARGET — Stroke Rehab Prediction",
+  title: "Stroke Rehab Prediction — Andras Kasa's Master's thesis",
   description:
     "Bayesian discharge prediction for early-phase stroke rehabilitation patients.",
 };
