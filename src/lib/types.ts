@@ -13,10 +13,36 @@ export type Features = Partial<Record<FieldKey, number>>;
 
 export type EndpointKey = "Barthel" | "FIM_Total" | "FIM_Motor" | "Gait" | "MRS";
 
+export type ShapFeature = {
+  key: string;
+  label: string;
+  /** Raw (uncentred) input value used in this SHAP calculation. */
+  value: number;
+  /** Posterior mean Shapley value on the prediction scale (score for
+   * continuous endpoints, probability in [0,1] for binary). */
+  mean: number;
+  ci_low: number;
+  ci_high: number;
+};
+
+export type ShapBlock = {
+  baseline_mean: number;
+  baseline_ci_low: number;
+  baseline_ci_high: number;
+  prediction_mean: number;
+  features: ShapFeature[];
+};
+
 export type LockedResult = {
   status: "locked";
   missing_required: string[];
   imputed_fields: string[];
+  median: number;
+  ci_50_low: number;
+  ci_50_high: number;
+  ci_95_low: number;
+  ci_95_high: number;
+  shap: ShapBlock;
 };
 
 export type ScoredResult = {
@@ -27,6 +53,7 @@ export type ScoredResult = {
   ci_95_low: number;
   ci_95_high: number;
   imputed_fields: string[];
+  shap: ShapBlock;
 };
 
 export type EndpointResult = LockedResult | ScoredResult;

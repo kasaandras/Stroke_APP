@@ -4,6 +4,7 @@ import Banner from "@/components/Banner";
 import EndpointCard from "@/components/EndpointCard";
 import InputsPane from "@/components/InputsPane";
 import MobileChipStrip from "@/components/MobileChipStrip";
+import ShapPanel from "@/components/ShapPanel";
 import { FIELDS } from "@/lib/fields";
 import { useDebounced } from "@/lib/hooks";
 import { fetchPredict } from "@/lib/predict";
@@ -12,11 +13,14 @@ import type { Features, FieldKey, PredictResponse } from "@/lib/types";
 
 const EMPTY_FEATURES: Features = {};
 
+type RightTab = "predictions" | "shap";
+
 export default function Page() {
   const [features, setFeatures] = useState<Features>(EMPTY_FEATURES);
   const [predictions, setPredictions] = useState<PredictResponse | undefined>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [tab, setTab] = useState<RightTab>("predictions");
 
   const debounced = useDebounced(features, 300);
 
@@ -113,7 +117,7 @@ export default function Page() {
             />
           </section>
 
-          {/* Prediction cards */}
+          {/* Predictions / SHAP tabbed pane */}
           <section aria-label="Predicted discharge outcomes" className="flex flex-col gap-4">
             <div className="mb-1 flex items-baseline justify-between">
               <h2 className="text-xl font-semibold tracking-tight text-slate-900">
@@ -123,7 +127,28 @@ export default function Page() {
                 <span className="text-xs text-red-600">{error}</span>
               ) : null}
             </div>
-            {cards}
+
+            <nav
+              aria-label="Right pane view"
+              className="inline-flex w-fit rounded-lg border border-slate-200 bg-white p-0.5 text-sm"
+            >
+              {(["predictions", "shap"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={`rounded-md px-3 py-1 transition ${
+                    tab === t
+                      ? "bg-teal-50 font-medium text-teal-800 ring-1 ring-teal-200"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {t === "predictions" ? "Predictions" : "SHAP"}
+                </button>
+              ))}
+            </nav>
+
+            {tab === "predictions" ? cards : <ShapPanel predictions={predictions} />}
           </section>
         </div>
 
