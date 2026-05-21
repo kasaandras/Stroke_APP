@@ -25,14 +25,6 @@ export default function ShapWaterfall({ spec, shap }: Props) {
     (a, b) => Math.abs(b.mean) - Math.abs(a.mean),
   );
 
-  // X-axis range: span the prediction scale, padded so error bars don't fly
-  // off the edges. For binary, use [0,1]; for continuous, use the clinical
-  // bounds plus a small margin.
-  const axisLo = spec.kind === "binary" ? 0 : spec.axis!.lo;
-  const axisHi = spec.kind === "binary" ? 1 : spec.axis!.hi;
-  const toPct = (v: number) =>
-    Math.max(0, Math.min(100, ((v - axisLo) / (axisHi - axisLo)) * 100));
-
   // Cumulative SHAP per row, starting at baseline.
   let cum = shap.baseline_mean;
   const rows = ordered.map((f) => {
@@ -42,27 +34,52 @@ export default function ShapWaterfall({ spec, shap }: Props) {
     return { ...f, start, end };
   });
 
+  // Auto-zoom x-axis to the actual data range with 15% padding, clipped to
+  // the endpoint's clinical bounds. Using the full 0-100 (or 0-1) axis hides
+  // most of the action when inputs are close to cohort medians and SHAP
+  // contributions are all sub-unit.
+  const clinicalLo = spec.kind === "binary" ? 0 : spec.axis!.lo;
+  const clinicalHi = spec.kind === "binary" ? 1 : spec.axis!.hi;
+  const xValues: number[] = [shap.baseline_mean, shap.prediction_mean];
+  for (const r of rows) {
+    xValues.push(r.start, r.end, r.start + r.ci_low, r.start + r.ci_high);
+  }
+  const dataLo = Math.min(...xValues);
+  const dataHi = Math.max(...xValues);
+  const dataSpan = Math.max(dataHi - dataLo, spec.kind === "binary" ? 0.02 : 1);
+  const pad = dataSpan * 0.2;
+  const axisLo = Math.max(clinicalLo, dataLo - pad);
+  const axisHi = Math.min(clinicalHi, dataHi + pad);
+  const toPct = (v: number) =>
+    Math.max(0, Math.min(100, ((v - axisLo) / (axisHi - axisLo)) * 100));
+
   const baselinePct = toPct(shap.baseline_mean);
   const predictionPct = toPct(shap.prediction_mean);
+  // Stack the two top markers vertically when they're close enough that the
+  // text would otherwise collide (~15% of axis width).
+  const markersClose = Math.abs(predictionPct - baselinePct) < 18;
 
   return (
     <div className="flex flex-col gap-3">
-      {/* axis header */}
-      <div className="relative h-7 text-[11px] text-slate-500">
-        {/* baseline marker */}
+      {/* axis header. When the two markers would collide, stack them vertically
+       * (baseline on the top row, prediction on the bottom row) so the labels
+       * never overlap. */}
+      <div className={`relative ${markersClose ? "h-10" : "h-7"} text-[11px] text-slate-500`}>
         <div
           className="absolute -translate-x-1/2 whitespace-nowrap"
-          style={{ left: `${baselinePct}%` }}
+          style={{ left: `${baselinePct}%`, top: 0 }}
         >
           <div className="leading-none">baseline</div>
           <div className="tabular-nums leading-none text-slate-400">
             {formatValue(spec, shap.baseline_mean)}
           </div>
         </div>
-        {/* prediction marker */}
         <div
-          className="absolute -translate-x-1/2 whitespace-nowrap text-right text-teal-800"
-          style={{ left: `${predictionPct}%` }}
+          className="absolute -translate-x-1/2 whitespace-nowrap text-teal-800"
+          style={{
+            left: `${predictionPct}%`,
+            top: markersClose ? 22 : 0,
+          }}
         >
           <div className="leading-none font-medium">prediction</div>
           <div className="tabular-nums leading-none">
@@ -98,16 +115,16 @@ export default function ShapWaterfall({ spec, shap }: Props) {
                   = {r.value.toFixed(r.value % 1 === 0 ? 0 : 2)}
                 </span>
               </div>
-              <div className="relative h-4">
+              <div className="relative h-5">
                 {/* 95% CI band around this feature's contribution */}
                 <div
                   className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-slate-200"
-                  style={{ left: `${ciLeft}%`, width: `${ciWidth}%` }}
+                  style={{ left: `${ciLeft}%`, width: `${Math.max(ciWidth, 0.4)}%` }}
                 />
                 {/* SHAP bar */}
                 <div
-                  className={`absolute top-1/2 h-3 -translate-y-1/2 rounded ${barColor}`}
-                  style={{ left: `${left}%`, width: `${Math.max(width, 0.2)}%` }}
+                  className={`absolute top-1/2 h-3.5 -translate-y-1/2 rounded ${barColor}`}
+                  style={{ left: `${left}%`, width: `${Math.max(width, 0.8)}%` }}
                 />
               </div>
               <div className="text-right tabular-nums text-slate-600">
