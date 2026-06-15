@@ -10,16 +10,18 @@ credible intervals.
 
 ```
 TARGET_BCN_APP/
-├── src/                 # Next.js + TypeScript UI (App Router)
+├── src/                 # Next.js + TypeScript UI (App Router, 3 tabs)
 ├── api/                 # Python serverless functions (Vercel)
-│   ├── predict.py       # POST /api/predict (FastAPI app)
-│   ├── _core.py         # predict() implementation + constants
-│   ├── _tests.py        # self-consistency tests vs stored draws
-│   ├── data/*.pkl       # posterior draws from the thesis fit
-│   └── requirements.txt # numpy / scipy / fastapi / uvicorn
+│   ├── predict.py       # POST /api/predict — Bayesian discharge + SHAP
+│   ├── recommend.py     # POST /api/recommend — fuzzy treatment ranker
+│   ├── _local_dev.py    # combined uvicorn entry for `next dev`
+│   ├── _tests.py        # self-consistency tests for predict.py
+│   ├── data/*.pkl       # posterior draws (5 endpoints)
+│   ├── data/*.csv       # SCOAR arm summary + synthetic trials
+│   └── requirements.txt # numpy / scipy / pandas / fastapi / uvicorn
 ├── public/              # Next.js static assets
 ├── next.config.ts       # Next.js config (dev proxy for /api/*)
-├── vercel.json          # Vercel build config (bundles .pkl with function)
+├── vercel.json          # Vercel build config (maxDuration per function)
 └── README.md
 ```
 
@@ -35,11 +37,11 @@ rewrite is a no-op and `/api/predict` goes straight to the Python
 serverless function.
 
 ```bash
-# Terminal 1 -- Python backend
+# Terminal 1 -- Python backend (combined dev entry, all /api/* routes)
 cd api
 python3.13 -m venv .venv                # first time only
 ./.venv/bin/pip install -r requirements.txt   # first time only
-./.venv/bin/uvicorn predict:app --reload --port 8000
+./.venv/bin/uvicorn _local_dev:dev --reload --port 8000
 
 # Terminal 2 -- Next.js frontend (from repo root)
 cp .env.local.example .env.local        # first time only

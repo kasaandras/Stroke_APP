@@ -2,6 +2,9 @@
   "functions": {
     "api/predict.py": {
       "maxDuration": 30
+    },
+    "api/recommend.py": {
+      "maxDuration": 30
     }
   }
 }

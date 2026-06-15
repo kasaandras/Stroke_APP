@@ -5,6 +5,7 @@ import EndpointCard from "@/components/EndpointCard";
 import InputsPane from "@/components/InputsPane";
 import MobileChipStrip from "@/components/MobileChipStrip";
 import ShapPanel from "@/components/ShapPanel";
+import TreatmentsPanel from "@/components/TreatmentsPanel";
 import { FIELDS } from "@/lib/fields";
 import { useDebounced } from "@/lib/hooks";
 import { fetchPredict } from "@/lib/predict";
@@ -13,7 +14,13 @@ import type { Features, FieldKey, PredictResponse } from "@/lib/types";
 
 const EMPTY_FEATURES: Features = {};
 
-type RightTab = "predictions" | "shap";
+type RightTab = "predictions" | "shap" | "treatments";
+
+const TAB_LABELS: Record<RightTab, string> = {
+  predictions: "Predictions",
+  shap: "SHAP",
+  treatments: "Treatments",
+};
 
 export default function Page() {
   const [features, setFeatures] = useState<Features>(EMPTY_FEATURES);
@@ -132,7 +139,7 @@ export default function Page() {
               aria-label="Right pane view"
               className="inline-flex w-fit rounded-lg border border-slate-200 bg-white p-0.5 text-sm"
             >
-              {(["predictions", "shap"] as const).map((t) => (
+              {(["predictions", "shap", "treatments"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -143,12 +150,14 @@ export default function Page() {
                       : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  {t === "predictions" ? "Predictions" : "SHAP"}
+                  {TAB_LABELS[t]}
                 </button>
               ))}
             </nav>
 
-            {tab === "predictions" ? cards : <ShapPanel predictions={predictions} />}
+            {tab === "predictions" ? cards :
+              tab === "shap" ? <ShapPanel predictions={predictions} /> :
+              <TreatmentsPanel features={features} />}
           </section>
         </div>
 
