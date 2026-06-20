@@ -8,6 +8,13 @@ export type RankedTreatment = {
   ci_method: "between-arm" | "within-arm-only" | "no-data";
   n_arms: number;
   n_patients: number;
+  /** baseline + Δ, raw (may exceed the 2.5 m/s physiological ceiling). */
+  predicted_discharge_mps: number | null;
+  discharge_above_ceiling: boolean;
+  /** (min, max) of baselines across arms contributing to this row. */
+  studied_baseline_range: [number, number] | null;
+  /** Query baseline > max studied baseline for this row's arms. */
+  baseline_above_studied_range: boolean;
 };
 
 export type NoGaitEntry = {
@@ -33,6 +40,9 @@ export type RecommendResponse = {
   no_gait: NoGaitEntry[];
   top3_all_overlap: boolean | null;
   pairs_nonoverlap: { a: string; b: string }[];
+  query_gait_mps: number;
+  /** Physiological reference (2.5 m/s). Above this, discharge_above_ceiling fires. */
+  ceiling_mps: number;
 };
 
 export type RecommendInput = {

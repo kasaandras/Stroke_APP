@@ -82,7 +82,12 @@ def severity_score(gait_mps: float, n_for_prec: int,
 
 # ─── fuzzy membership functions ──────────────────────────────────────────────
 def trap_mf(x: float, a: float, b: float, c: float, d: float) -> float:
-    if x <= a or x >= d:
+    # Strict inequalities at the outer edges so shouldered MFs (a == b
+    # left-shouldered, c == d right-shouldered) return μ = 1 at their boundary
+    # rather than 0. The previous `x <= a or x >= d` form silently zeroed Mild
+    # at x=0, Severe at x=1, and Old at x=100 -- the bug fix moves arms with
+    # severity = 1.0 exactly from Mild × Old to Severe × Old.
+    if x < a or x > d:
         return 0.0
     if b <= x <= c:
         return 1.0
@@ -203,6 +208,7 @@ def _build_systems(arms: pd.DataFrame) -> dict:
                             n=int(row["n_patients"]),
                             within_delta_sd=(float(row["within_delta_sd"])
                                               if pd.notna(row["within_delta_sd"]) else None),
+                            arm_baseline_mps=float(row["baseline_mps"]),
                         ))
                     total_n = sum(a["n"] for a in arm_details)
                     nw_mean = (sum(a["delta"] * a["n"] for a in arm_details) / total_n
@@ -263,8 +269,52 @@ def _cis_overlap(ci_a: tuple, ci_b: tuple) -> bool:
     return max(ci_a[0], ci_b[0]) <= min(ci_a[1], ci_b[1])
 
 
+# ─── Soft warnings: physiological ceiling + studied-baseline-range ──────────
+# Both are FLAGS only. Predicted Δ and CIs are returned UNMODIFIED. The UI
+# decides how to display the warnings.
+GAIT_DISCHARGE_CEILING_MPS = 2.5  # synthesis Gait_speed scale ceiling
+
+
+def _apply_ceiling_and_range(row: dict, query_baseline_mps: float | None,
+                              arm_details: list) -> dict:
+    """Add diagnostic fields without modifying predicted_delta_mps or its CIs:
+       - predicted_discharge_mps          = baseline + Δ  (may exceed 2.5)
+       - discharge_above_ceiling          = True if discharge > 2.5 m/s
+       - studied_baseline_range           = (min, max) of arm baselines for
+                                             arms contributing to this row
+       - baseline_above_studied_range     = baseline > max studied baseline
+    """
+    out = dict(row)
+    arm_baselines = [a["arm_baseline_mps"] for a in arm_details
+                     if a.get("arm_baseline_mps") is not None]
+    if arm_baselines:
+        out["studied_baseline_range"] = (float(min(arm_baselines)),
+                                          float(max(arm_baselines)))
+    else:
+        out["studied_baseline_range"] = None
+
+    if query_baseline_mps is None:
+        out["predicted_discharge_mps"] = None
+        out["discharge_above_ceiling"] = False
+        out["baseline_above_studied_range"] = False
+        return out
+
+    b = float(query_baseline_mps)
+    disch = b + float(row["predicted_delta_mps"])
+    out["predicted_discharge_mps"] = float(disch)
+    out["discharge_above_ceiling"] = bool(disch > GAIT_DISCHARGE_CEILING_MPS + 1e-9)
+    if out["studied_baseline_range"] is not None:
+        out["baseline_above_studied_range"] = bool(
+            b > out["studied_baseline_range"][1] + 1e-9
+        )
+    else:
+        out["baseline_above_studied_range"] = False
+    return out
+
+
 def rank_treatments(severity: float, age: float, days_ps: float,
-                    systems: dict) -> dict:
+                    systems: dict,
+                    query_gait_mps: float | None = None) -> dict:
     chron = chronicity_band(days_ps)
     system = systems[chron]
     sev_mu = memberships(severity, SEVERITY_MF)
@@ -294,12 +344,14 @@ def rank_treatments(severity: float, age: float, days_ps: float,
         ci = _compute_treatment_ci(d["arm_details"])
         if np.isnan(ci["mean"]):
             continue
-        ranked.append(dict(treatment=t,
-                            predicted_delta_mps=ci["mean"],
-                            ci_lo=ci["ci_lo"], ci_hi=ci["ci_hi"],
-                            ci_method=ci["method"],
-                            n_arms=ci["K"],
-                            n_patients=ci["n"]))
+        row = dict(treatment=t,
+                    predicted_delta_mps=ci["mean"],
+                    ci_lo=ci["ci_lo"], ci_hi=ci["ci_hi"],
+                    ci_method=ci["method"],
+                    n_arms=ci["K"],
+                    n_patients=ci["n"])
+        row = _apply_ceiling_and_range(row, query_gait_mps, d["arm_details"])
+        ranked.append(row)
     ranked.sort(key=lambda r: -r["predicted_delta_mps"])
 
     pairs_nonoverlap = []
@@ -329,7 +381,9 @@ def rank_treatments(severity: float, age: float, days_ps: float,
     return dict(chronicity=chron, cell_firings=cell_firings,
                 ranked=ranked, no_gait=no_gait_list,
                 top3_all_overlap=top3_all_overlap,
-                pairs_nonoverlap=pairs_nonoverlap)
+                pairs_nonoverlap=pairs_nonoverlap,
+                query_gait_mps=query_gait_mps,
+                ceiling_mps=GAIT_DISCHARGE_CEILING_MPS)
 
 
 # ─── FastAPI app ─────────────────────────────────────────────────────────────
@@ -362,7 +416,8 @@ def recommend_route(req: RecommendRequest):
         other_scales["FIM_Total"] = req.fim_total
 
     sev, used, _ = severity_score(req.gait_mps, 1, None, other_scales)
-    res = rank_treatments(sev, req.age, req.days_ps, get_systems())
+    res = rank_treatments(sev, req.age, req.days_ps, get_systems(),
+                          query_gait_mps=req.gait_mps)
 
     sev_mu = memberships(sev, SEVERITY_MF)
     age_mu = memberships(req.age, AGE_MF)
@@ -374,6 +429,26 @@ def recommend_route(req: RecommendRequest):
     ]
     pairs = [{"a": a, "b": b} for a, b in res["pairs_nonoverlap"]]
 
+    ranked_json = []
+    for r in res["ranked"]:
+        sbr = r.get("studied_baseline_range")
+        ranked_json.append({
+            "treatment": r["treatment"],
+            "predicted_delta_mps": float(r["predicted_delta_mps"]),
+            "ci_lo": float(r["ci_lo"]) if r["ci_lo"] is not None else None,
+            "ci_hi": float(r["ci_hi"]) if r["ci_hi"] is not None else None,
+            "ci_method": r["ci_method"],
+            "n_arms": r["n_arms"],
+            "n_patients": r["n_patients"],
+            # New diagnostic fields. Raw values, never clipped.
+            "predicted_discharge_mps": (float(r["predicted_discharge_mps"])
+                                        if r.get("predicted_discharge_mps") is not None else None),
+            "discharge_above_ceiling": bool(r.get("discharge_above_ceiling", False)),
+            "studied_baseline_range": ([float(sbr[0]), float(sbr[1])]
+                                        if sbr is not None else None),
+            "baseline_above_studied_range": bool(r.get("baseline_above_studied_range", False)),
+        })
+
     return {
         "chronicity": res["chronicity"],
         "severity": float(sev),
@@ -381,17 +456,13 @@ def recommend_route(req: RecommendRequest):
         "severity_memberships": {k: float(v) for k, v in sev_mu.items()},
         "age_memberships": {k: float(v) for k, v in age_mu.items()},
         "cell_firings": cell_firings_dict,
-        "ranked": [
-            {**r,
-             "predicted_delta_mps": float(r["predicted_delta_mps"]),
-             "ci_lo": float(r["ci_lo"]) if r["ci_lo"] is not None else None,
-             "ci_hi": float(r["ci_hi"]) if r["ci_hi"] is not None else None}
-            for r in res["ranked"]
-        ],
+        "ranked": ranked_json,
         "no_gait": [
             {"treatment": e["treatment"], "scales": e["scales"], "n_arms": e["n_arms"]}
             for e in res["no_gait"]
         ],
         "top3_all_overlap": res["top3_all_overlap"],
         "pairs_nonoverlap": pairs,
+        "query_gait_mps": float(req.gait_mps),
+        "ceiling_mps": float(res["ceiling_mps"]),
     }

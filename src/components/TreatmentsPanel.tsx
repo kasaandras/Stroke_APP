@@ -45,17 +45,19 @@ export default function TreatmentsPanel({ features }: Props) {
 
   const input = buildRecommendInput(debounced);
 
+  const inputKey = input ? JSON.stringify(input) : "";
+  /* eslint-disable react-hooks/set-state-in-effect --
+     Identical fetch/abort/setState pattern to src/app/page.tsx; the rule
+     only fires here because of the inputKey early return guard. */
   useEffect(() => {
-    if (!input) {
-      setData(undefined);
-      return;
-    }
+    if (!inputKey) return;
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setLoading(true);
     setError(undefined);
-    fetchRecommend(input, ctrl.signal)
+    const reqInput = JSON.parse(inputKey) as typeof input & object;
+    fetchRecommend(reqInput, ctrl.signal)
       .then((r) => {
         if (!ctrl.signal.aborted) setData(r);
       })
@@ -67,9 +69,11 @@ export default function TreatmentsPanel({ features }: Props) {
         if (!ctrl.signal.aborted) setLoading(false);
       });
     return () => ctrl.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(input)]);
+  }, [inputKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
+  // When the required inputs aren't filled, render the empty state and don't
+  // show any cached recommendations from a previous valid input.
   if (!input) {
     return (
       <article className="rounded-xl border border-slate-200 bg-slate-100/70 px-5 py-4">
@@ -161,6 +165,13 @@ export default function TreatmentsPanel({ features }: Props) {
                   <tbody className="divide-y divide-slate-100">
                     {data.ranked.map((r, i) => {
                       const isThin = r.ci_method === "within-arm-only";
+                      const aboveCeiling = r.discharge_above_ceiling;
+                      const aboveStudied = r.baseline_above_studied_range;
+                      const sbr = r.studied_baseline_range;
+                      const studiedRangeTooltip =
+                        sbr !== null
+                          ? `Trials behind this row studied baselines ${sbr[0].toFixed(2)}–${sbr[1].toFixed(2)} m/s; this patient's baseline is higher. Recommendation is observational extrapolation.`
+                          : "";
                       return (
                         <tr key={r.treatment} className="align-top">
                           <td className="px-5 py-2 text-right tabular-nums text-slate-500">
@@ -170,29 +181,57 @@ export default function TreatmentsPanel({ features }: Props) {
                             {r.treatment}
                           </td>
                           <td className="py-2 pr-3 text-right tabular-nums text-slate-800">
-                            <span className="font-semibold">
-                              {fmt3(r.predicted_delta_mps)}
-                            </span>{" "}
-                            <span className="text-slate-500">
+                            <div>
+                              <span className="font-semibold">
+                                {fmt3(r.predicted_delta_mps)}
+                              </span>
+                              {r.predicted_discharge_mps !== null ? (
+                                <span className="text-slate-500">
+                                  {" "}→ {r.predicted_discharge_mps.toFixed(2)} m/s
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-[11px] text-slate-500">
                               [{fmt3(r.ci_lo)}, {fmt3(r.ci_hi)}]
-                            </span>
+                            </div>
                           </td>
                           <td className="py-2 pr-3 text-right text-slate-500 tabular-nums">
                             {r.n_arms} arm{r.n_arms === 1 ? "" : "s"}, {r.n_patients} pts
                           </td>
                           <td className="py-2 pr-5">
-                            {isThin ? (
-                              <span
-                                title="CI based only on within-trial patient variability; understates true uncertainty by 5–10×"
-                                className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900"
-                              >
-                                single trial — uncertainty understated
-                              </span>
-                            ) : (
-                              <span className="text-[10px] uppercase tracking-wider text-slate-400">
-                                between-arm
-                              </span>
-                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {isThin ? (
+                                <span
+                                  title="CI based only on within-trial patient variability; understates true uncertainty by 5–10×"
+                                  className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900"
+                                >
+                                  ⚠ single trial — uncertainty understated
+                                </span>
+                              ) : (
+                                <span className="text-[10px] uppercase tracking-wider text-slate-400">
+                                  between-arm
+                                </span>
+                              )}
+                              {aboveCeiling ? (
+                                <span
+                                  title={`Healthy elderly comfortable walking is ~1.3 m/s, max walking ~2.0–2.5 m/s. Interpret the predicted Δ with caution. Implied discharge ${r.predicted_discharge_mps?.toFixed(2)} m/s > ${data.ceiling_mps} m/s.`}
+                                  className="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-900"
+                                >
+                                  ⚠ discharge above ceiling ({data.ceiling_mps} m/s)
+                                </span>
+                              ) : null}
+                              {aboveStudied ? (
+                                <span
+                                  title={studiedRangeTooltip}
+                                  className="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-900"
+                                >
+                                  ⚠ baseline above trial-evidence range
+                                  {sbr !== null
+                                    ? ` (${sbr[0].toFixed(2)}–${sbr[1].toFixed(2)})`
+                                    : ""}
+                                </span>
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       );

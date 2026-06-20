@@ -25,14 +25,15 @@ export default function ShapWaterfall({ spec, shap }: Props) {
     (a, b) => Math.abs(b.mean) - Math.abs(a.mean),
   );
 
-  // Cumulative SHAP per row, starting at baseline.
-  let cum = shap.baseline_mean;
-  const rows = ordered.map((f) => {
-    const start = cum;
-    const end = cum + f.mean;
-    cum = end;
-    return { ...f, start, end };
-  });
+  // Cumulative SHAP per row, starting at baseline. Avoid mutating outer
+  // bindings inside .map (eslint react-hooks/immutability).
+  const rows = ordered.reduce<
+    Array<(typeof ordered)[number] & { start: number; end: number }>
+  >((acc, f) => {
+    const start = acc.length === 0 ? shap.baseline_mean : acc[acc.length - 1].end;
+    acc.push({ ...f, start, end: start + f.mean });
+    return acc;
+  }, []);
 
   // Auto-zoom x-axis to the actual data range with 15% padding, clipped to
   // the endpoint's clinical bounds. Using the full 0-100 (or 0-1) axis hides

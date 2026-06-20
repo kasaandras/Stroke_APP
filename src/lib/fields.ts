@@ -58,10 +58,10 @@ export const FIELDS: FieldSpec[] = [
     key: "VLX Marxa_bl",
     label: "Gait velocity (admission)",
     min: 0,
-    max: 3,
+    max: 2.5,
     step: 0.01,
     cohortMedian: 0.29,
-    hint: "m/s",
+    hint: "m/s, max 2.5 (recommender domain)",
   },
   {
     key: "Mrs_bl",
